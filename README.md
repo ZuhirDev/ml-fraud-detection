@@ -62,3 +62,10 @@ El proyecto cubre el **ciclo de vida completo del dato**:
 * **Dataset Principal:** Dataset sintético de transacciones financieras.
 * **Volumen:** `6.3 Millones de registros`.
 * **Justificación:** Permite simular un entorno de producción de Big Data real y trabajar la escalabilidad de las herramientas propuestas frente a un problema de clases altamente desbalanceadas.
+
+---
+
+## 🧑‍💻 Autores
+
+- [@Poempollo](https://github.com/Poempollo)
+- [@ZuhirDev](https://github.com/ZuhirDev)
