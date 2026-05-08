@@ -1,0 +1,12 @@
+
+# Neo4j (si se utiliza desde la infraestructura)
+neo4j
+
+pandas==2.2.2
+scikit-learn==1.5.0
+
+
+# API server
+fastapi==0.95.2
+uvicorn[standard]==0.22.0
+joblib==1.3.2

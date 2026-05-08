@@ -1,0 +1,17 @@
+services:
+  ai-service:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    container_name: ai-service
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../src:/app/src
+      - ../../models:/app/models
+    networks:
+      - ml-network
+
+networks:
+  ml-network:
+    driver: bridge
