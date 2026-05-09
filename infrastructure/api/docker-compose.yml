@@ -4,14 +4,16 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: ai-service
+    env_file:
+      - ../../.env
     ports:
       - "8000:8000"
     volumes:
       - ../../src:/app/src
       - ../../models:/app/models
     networks:
-      - ml-network
+      - shared-ml-network
 
 networks:
-  ml-network:
-    driver: bridge
+  shared-ml-network:
+    external: true

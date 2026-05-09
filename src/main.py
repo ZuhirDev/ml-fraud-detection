@@ -3,6 +3,11 @@ from pydantic import BaseModel
 import pandas as pd
 import joblib
 import logging
+from pathlib import Path
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # 1️⃣ Configuramos logging
 logging.basicConfig(
@@ -34,8 +39,12 @@ class Transaction(BaseModel):
     type_TRANSFER: float
 
 # 4️⃣ Cargamos el modelo completo (modelo + scaler + features + umbral)
+BASE_DIR = Path(__file__).resolve().parent.parent
+MODEL_NAME = os.getenv("MODEL_NAME", "modelo_fraude_rf_final.joblib")
+MODEL_PATH = BASE_DIR / "models" / MODEL_NAME
+
 logger.info("🔹 Cargando modelo de fraude...")
-datos_cargados = joblib.load("../models/modelo_fraude_rf_final.joblib")
+datos_cargados = joblib.load(MODEL_PATH)
 modelo = datos_cargados['modelo']
 scaler = datos_cargados['scaler']
 features_esperadas = datos_cargados['features']

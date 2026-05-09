@@ -1,4 +1,7 @@
 
+# Env vars
+python-dotenv==1.0.1
+
 # Neo4j (si se utiliza desde la infraestructura)
 neo4j
 

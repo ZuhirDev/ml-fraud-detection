@@ -14,6 +14,9 @@ seaborn==0.13.2
 jupyterlab==4.2.2
 ipykernel==6.29.4
 
+# Env vars
+python-dotenv==1.0.1
+
 # Neo4j (si se utiliza desde la infraestructura)
 neo4j
 

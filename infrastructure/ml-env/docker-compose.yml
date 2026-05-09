@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     image: ml-env:latest
     container_name: ml-env
+    env_file:
+      - ../../.env
     ports:
       - "8888:8888"
     volumes:
@@ -16,7 +18,7 @@ services:
       - JUPYTER_ENABLE_LAB=yes
       - PYTHONPATH=/app/src
     networks:
-      - ml_env_network
+      - shared-ml-network
 
   neo4j:
     image: neo4j:2025.09.0-enterprise-bullseye
@@ -26,7 +28,7 @@ services:
       - "7473:7473"   # Bloom (HTTPS)
       - "7687:7687"   # Bolt protocol
     environment:
-      - NEO4J_AUTH=neo4j/password
+      - NEO4J_AUTH=${NEO4J_AUTH}
       - NEO4J_PLUGINS=["apoc", "apoc-extended","graph-data-science", "bloom", "genai"]
       - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
     volumes:
@@ -34,8 +36,8 @@ services:
       - ../../logs:/logs
       - ../../plugins:/plugins
     networks:
-      - ml_env_network
+      - shared-ml-network
 
 networks:
-  ml_env_network:
-    driver: bridge
+  shared-ml-network:
+    external: true
