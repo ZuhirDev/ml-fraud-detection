@@ -1,0 +1,40 @@
+services:
+  hadoop:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: fraud-hadoop:latest
+    container_name: hadoop
+    hostname: hadoop
+    environment:
+      - HADOOP_MODE=standalone
+    ports:
+      - "9870:9870"   # NameNode Web UI
+      - "9000:9000"   # HDFS RPC
+      - "8088:8088"   # YARN ResourceManager UI
+      - "8042:8042"   # NodeManager UI
+      - "19888:19888" # MapReduce JobHistory
+    volumes:
+      - hadoop_namenode:/opt/hadoop/data/nameNode
+      - hadoop_datanode:/opt/hadoop/data/dataNode
+      - hadoop_logs:/opt/hadoop/logs
+      - ../../notebooks:/notebooks          # acceso a los notebooks
+      - ../../data:/data                    # datos crudos / procesados
+    networks:
+      - shared-ml-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "hdfs dfsadmin -report 2>/dev/null | grep -q 'Live datanodes' || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+
+volumes:
+  hadoop_namenode:
+  hadoop_datanode:
+  hadoop_logs:
+
+networks:
+  shared-ml-network:
+    external: true
