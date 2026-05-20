@@ -30,7 +30,7 @@ services:
       - "7473:7473"   # Bloom (HTTPS)
       - "7687:7687"   # Bolt protocol
     environment:
-      - NEO4J_AUTH=${NEO4J_AUTH}
+      - NEO4J_AUTH=neo4j/password
       - NEO4J_PLUGINS=["apoc", "apoc-extended","graph-data-science", "bloom", "genai"]
       - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
     volumes:
