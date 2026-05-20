@@ -2,3 +2,9 @@
 /logs
 /plugins
 /data
+
+/aws
+/terraform/terraform.tfvars
+/terraform/.terraform/
+/terraform/terraform.tfstate
+/terraform/terraform.tfstate.backup
