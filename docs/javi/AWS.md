@@ -5,6 +5,34 @@
 
 ---
 
+## Instancia activa — `54.91.126.202`
+
+> EC2 `t3.large` · Ubuntu 22.04 · Key Pair: `claves-ml`
+
+| Servicio | URL |
+|---|---|
+| FastAPI (Swagger) | http://54.91.126.202:8000/docs |
+| FastAPI (health) | http://54.91.126.202:8000/health |
+| JupyterLab | http://54.91.126.202:8888 |
+| Hadoop NameNode UI | http://54.91.126.202:9870 |
+| YARN ResourceManager | http://54.91.126.202:8088 |
+| Neo4j Browser | http://54.91.126.202:7474 (user: `neo4j` / pass: `password`) |
+| n8n | http://54.91.126.202:5678 |
+
+SSH:
+```bash
+ssh -i ~/.ssh/claves-ml.pem ubuntu@54.91.126.202
+# Windows PowerShell:
+ssh -i "$env:USERPROFILE\.ssh\claves-ml.pem" ubuntu@54.91.126.202
+```
+
+Ver logs de arranque:
+```bash
+ssh -i ~/.ssh/claves-ml.pem ubuntu@54.91.126.202 "sudo tail -50 /var/log/user-data.log"
+```
+
+---
+
 ## Arquitectura objetivo
 
 ```
@@ -365,6 +393,81 @@ terraform destroy -var="key_pair_name=vockey" -auto-approve
 # O solo parar la EC2:
 aws ec2 stop-instances --instance-ids <ID>
 ```
+
+---
+
+## Despliegue desde cero (cualquier máquina)
+
+### Requisitos previos
+- Terraform instalado (`terraform -v`)
+- Fichero `.pem` del Key Pair en `~/.ssh/claves-ml.pem` (chmod 600 en Linux/Mac)
+- Credenciales AWS Academy activas
+
+### Pasos
+
+**1. Instalar Terraform** (si no está)
+```bash
+# Linux/Debian (PC de clase):
+wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+unzip terraform_*.zip && sudo mv terraform /usr/local/bin/
+
+# Windows:
+winget install HashiCorp.Terraform
+```
+
+**2. Clonar el repo y crear terraform.tfvars**
+```bash
+git clone https://github.com/ZuhirDev/ml-fraud-detection.git
+cd ml-fraud-detection/terraform
+
+cat > terraform.tfvars <<EOF
+key_pair_name = "claves-ml"
+repo_url      = "https://github.com/ZuhirDev/ml-fraud-detection.git"
+EOF
+```
+
+**3. Pegar credenciales del laboratorio AWS**
+```bash
+# Linux/Mac:
+export AWS_ACCESS_KEY_ID="ASIA..."
+export AWS_SECRET_ACCESS_KEY="..."
+export AWS_SESSION_TOKEN="..."
+export AWS_DEFAULT_REGION="us-east-1"
+
+# Windows PowerShell:
+$env:AWS_ACCESS_KEY_ID     = "ASIA..."
+$env:AWS_SECRET_ACCESS_KEY = "..."
+$env:AWS_SESSION_TOKEN     = "..."
+$env:AWS_DEFAULT_REGION    = "us-east-1"
+```
+
+**4. Inicializar y desplegar**
+```bash
+terraform init
+terraform apply    # confirmar con "yes"
+```
+Terraform muestra la IP y todas las URLs al terminar (~2 min para EC2, ~20 min para build de imágenes Docker).
+
+**5. Monitorizar el arranque**
+```bash
+# Sustituir IP por la que aparece en el output de terraform apply
+ssh -i ~/.ssh/claves-ml.pem ubuntu@<IP> "sudo tail -f /var/log/user-data.log"
+# Cuando veas "DONE — Stack levantado", todos los servicios están disponibles
+```
+
+**6. Al terminar — apagar para no gastar crédito**
+```bash
+terraform destroy   # borra todo
+# O solo parar la EC2 (conserva IP elástica si tienes):
+aws ec2 stop-instances --instance-ids <ID>
+```
+
+> **Credenciales AWS Academy**: caducan cada ~4h. Si `terraform apply` falla con
+> "No valid credential sources", vuelve a AWS Academy → AWS Details → Show y repega las variables.
+
+> **Key Pair en nueva sesión de lab**: si el laboratorio se reinició desde cero, el Key Pair
+> `claves-ml` habrá desaparecido. Créalo de nuevo en EC2 → Key Pairs → Create, descarga
+> el `.pem` y actualiza `terraform.tfvars`.
 
 ---
 

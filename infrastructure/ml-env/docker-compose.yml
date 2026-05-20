@@ -23,6 +23,8 @@ services:
   neo4j:
     image: neo4j:2025.09.0-enterprise-bullseye
     container_name: neo4j
+    env_file:
+      - ../../.env
     ports:
       - "7474:7474"   # Neo4j Browser (HTTP)
       - "7473:7473"   # Bloom (HTTPS)

@@ -24,6 +24,12 @@ variable "repo_url" {
   #   "https://TOKEN@github.com/TU_USUARIO/ml-fraud-detection.git"
 }
 
+variable "repo_branch" {
+  description = "Rama de GitHub a clonar en la EC2"
+  type        = string
+  default     = "feature/hadoop"
+}
+
 variable "model_s3_path" {
   description = <<-EOT
     Ruta S3 del modelo .joblib si es demasiado grande para GitHub (>100 MB).

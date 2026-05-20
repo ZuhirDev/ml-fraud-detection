@@ -16,7 +16,7 @@ data "aws_ami" "ubuntu_22" {
 
 # ─── Security Group ─────────────────────────────────────────────────────────────
 resource "aws_security_group" "fraud_sg" {
-  name        = "fraud-detection-sg"
+  name        = "fraud-detection-sg-${random_id.suffix.hex}"
   description = "Acceso a los servicios del TFG de deteccion de fraude"
 
   ingress {
@@ -115,6 +115,7 @@ resource "aws_instance" "fraud_server" {
   # Progreso visible en: sudo tail -f /var/log/user-data.log
   user_data = templatefile("${path.module}/userdata.sh.tpl", {
     repo_url       = var.repo_url
+    repo_branch    = var.repo_branch
     model_s3_path  = var.model_s3_path
   })
 

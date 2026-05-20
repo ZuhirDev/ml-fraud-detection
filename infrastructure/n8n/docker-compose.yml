@@ -10,6 +10,7 @@ services:
       - N8N_PORT=5678
       - N8N_PROTOCOL=http
       - NODE_ENV=production
+      - N8N_SECURE_COOKIE=false
       # Persistencia de credenciales
       - N8N_ENCRYPTION_KEY=fraud-detection-n8n-secret-key-2024
       # SMTP para alertas de fraude (configurar con credenciales reales)

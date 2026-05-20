@@ -22,7 +22,7 @@ echo "========================================"
 echo " [2/6] Clonando repositorio"
 echo "========================================"
 cd /home/ubuntu
-git clone "${repo_url}" app
+git clone --branch "${repo_branch}" --single-branch "${repo_url}" app
 chown -R ubuntu:ubuntu app
 cd app
 
