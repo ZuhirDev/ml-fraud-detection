@@ -8,6 +8,17 @@ services:
     hostname: hadoop
     environment:
       - HADOOP_MODE=standalone
+      - HADOOP_HEAPSIZE=256       # heap NameNode + DataNode (MB) — por defecto 1000 MB
+      - YARN_HEAPSIZE=256         # heap ResourceManager + NodeManager (MB)
+      - HADOOP_OPTS=-Xmx256m      # cap adicional para procesos auxiliares
+    deploy:
+      resources:
+        limits:
+          memory: "2g"            # techo duro de RAM del contenedor
+          cpus: "1.5"             # máximo 1.5 vCPUs — evita saturar el host
+        reservations:
+          memory: "512m"
+          cpus: "0.5"
     ports:
       - "9870:9870"   # NameNode Web UI
       - "9000:9000"   # HDFS RPC
