@@ -3,6 +3,8 @@
 /plugins
 /data
 
+.env
+
 /aws
 /terraform/terraform.tfvars
 /terraform/.terraform/

@@ -1,100 +1,82 @@
-from fastapi import FastAPI
-from pydantic import BaseModel
-import pandas as pd
-import joblib
-import logging
-from pathlib import Path
 import os
+import logging
+from fastapi import FastAPI, HTTPException
+from neo4j import GraphDatabase
 from dotenv import load_dotenv
+
+from .predict import build_prediction_dataframe, format_prediction_result, modelo_fraude
+from .schemas import PredictionResponse, Transaction
+from .queries import obtener_grados_realtime, obtener_pagerank_realtime, obtener_comunidad_realtime
 
 load_dotenv()
 
-# 1️⃣ Configuramos logging
 logging.basicConfig(
-    level=logging.INFO,  # Cambiar a DEBUG para más detalle
-    format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
-# 2️⃣ Inicializamos FastAPI
 app = FastAPI(title="Fraud Detection API 🚀")
 
-# 3️⃣ Definimos el modelo de datos con Pydantic
-class Transaction(BaseModel):
-    amount: float
-    old_balance_orig: float
-    new_balance_orig: float
-    old_balance_dest: float
-    new_balance_dest: float
-    orig_out_degree: float
-    orig_pagerank: float
-    orig_community: float
-    dest_in_degree: float
-    dest_pagerank: float
-    dest_community: float
-    type_CASH_IN: float
-    type_CASH_OUT: float
-    type_DEBIT: float
-    type_PAYMENT: float
-    type_TRANSFER: float
+# Inicialización y gestión del ciclo de vida del Driver de Neo4j
+URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+AUTH = (os.getenv("NEO4J_USER", "neo4j"), os.getenv("NEO4J_PASSWORD", "password"))
+driver = None
 
-# 4️⃣ Cargamos el modelo completo (modelo + scaler + features + umbral)
-BASE_DIR = Path(__file__).resolve().parent.parent
-MODEL_NAME = os.getenv("MODEL_NAME", "modelo_fraude_rf_final.joblib")
-MODEL_PATH = BASE_DIR / "models" / MODEL_NAME
+@app.on_event("startup")
+def startup_event():
+    global driver
+    logger.info("🔌 Inicializando pool de conexiones globales a Neo4j...")
+    driver = GraphDatabase.driver(URI, auth=AUTH)
+    logger.info("✅ Driver de Neo4j conectado y listo.")
 
-logger.info("🔹 Cargando modelo de fraude...")
-datos_cargados = joblib.load(MODEL_PATH)
-modelo = datos_cargados['modelo']
-scaler = datos_cargados['scaler']
-features_esperadas = datos_cargados['features']
-umbral = datos_cargados['umbral']
-logger.info("✅ Modelo cargado correctamente")
+@app.on_event("shutdown")
+def shutdown_event():
+    global driver
+    if driver:
+        logger.info("🔌 Cerrando conexiones activas de Neo4j...")
+        driver.close()
+        logger.info("🛑 Pool de grafos liberado limpiamente.")
 
-# 5️⃣ Endpoint de health check
-@app.get("/")
-def health_check():
+@app.get("/", response_model=dict)
+def root() -> dict:
     logger.info("🔹 Health check en '/'")
     return {"message": "Welcome to the Fraud Detection API! 🚀"}
 
-@app.get("/health")
-def health_check_detail():
+@app.get("/health", response_model=dict)
+def health_check() -> dict:
     logger.info("🔹 Health check en '/health'")
-    return {"status": "ok", "message": "API is running ✅"}
+    return {"status": "ok", "message": "API and Graph driver are running smoothly ✅"}
 
-# 6️⃣ Endpoint de predicción
-@app.post("/predict")
-async def predict(transaction: Transaction):
-    logger.info(f"🔹 Recibida transacción: {transaction.dict()}")
+@app.post("/predict", response_model=PredictionResponse)
+async def predict(transaction: Transaction) -> dict:
+    if modelo_fraude is None:
+        logger.error("❌ Intento de predicción fallido: el modelo de ML no está cargado.")
+        raise HTTPException(status_code=500, detail="El modelo no está disponible en el servidor.")
 
     try:
-        # Convertimos el input a DataFrame
-        data = pd.DataFrame([transaction.dict()])
-        logger.debug(f"🔹 DataFrame inicial:\n{data}")
+        logger.info("🔮 Recibiendo transacción: %s -> %s para evaluación estructural...", transaction.nameOrig, transaction.nameDest)
+        
+        # 1. Extracción paralela/milisegundos desde la DB de grafos
+        grados = obtener_grados_realtime(driver, transaction.nameOrig, transaction.nameDest)
+        pagerank = obtener_pagerank_realtime(driver, transaction.nameOrig, transaction.nameDest)
+        comunidad = obtener_comunidad_realtime(driver, transaction.nameOrig, transaction.nameDest)
+        
+        # 2. Reconstrucción del DataFrame adaptado al modelo
+        df_predict = build_prediction_dataframe(transaction, grados, pagerank, comunidad)
 
-        # Nos aseguramos del orden correcto de columnas
-        data = data[features_esperadas]
-        logger.debug(f"🔹 DataFrame ordenado:\n{data}")
+        # 3. Inferencia mediante el Árbol de Decisión
+        prediction = int(modelo_fraude.predict(df_predict)[0])
+        probability = float(modelo_fraude.predict_proba(df_predict)[0][1])
 
-        # Escalamos las features
-        data_scaled = scaler.transform(data)
-        logger.debug(f"🔹 DataFrame escalado:\n{data_scaled}")
+        logger.info(
+            "✅ Predicción realizada con éxito. Resultado: %s, Probabilidad: %.4f",
+            prediction,
+            probability,
+        )
 
-        # Probabilidad de fraude
-        prob = modelo.predict_proba(data_scaled)[0][1]
-        logger.info(f"⚠️ Probabilidad de fraude calculada: {prob:.4f}")
-
-        # Aplicamos el umbral guardado
-        pred = int(prob >= umbral)
-        status_emoji = "❌" if pred else "✅"
-        logger.info(f"{status_emoji} Predicción final: {pred} usando umbral {umbral}")
-
-        return {
-            "fraud_probability": round(prob, 4),
-            "fraud_prediction": pred,
-            "threshold_used": umbral
-        }
-
-    except Exception as e:
-        logger.error(f"🔥 Error al procesar la transacción: {e}", exc_info=True)
-        return {"error": str(e)}
+        return format_prediction_result(prediction, probability)
+        
+    except Exception as error:
+        logger.error("❌ Error durante la tubería de inferencia: %s", error)
+        raise HTTPException(status_code=400, detail=f"Error al procesar los datos: {error}")
