@@ -1,0 +1,44 @@
+services:
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n
+    hostname: n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_HOST=0.0.0.0
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      # Persistencia de credenciales
+      - N8N_ENCRYPTION_KEY=fraud-detection-n8n-secret-key-2024
+      # SMTP para alertas de fraude (configurar con credenciales reales)
+      - N8N_EMAIL_MODE=smtp
+      - N8N_SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - N8N_SMTP_PORT=${SMTP_PORT:-587}
+      - N8N_SMTP_USER=${SMTP_USER:-}
+      - N8N_SMTP_PASS=${SMTP_PASS:-}
+      - N8N_SMTP_SENDER=${SMTP_SENDER:-fraude@tfg.local}
+      # URLs internas (resolvibles en shared-ml-network)
+      - FRAUD_API_URL=http://ai-service:8000
+      - HADOOP_WEBHDFS_URL=http://hadoop:9870/webhdfs/v1
+    volumes:
+      - n8n_data:/home/node/.n8n
+      - ../../data:/data:ro          # acceso de solo lectura a los datos procesados
+    networks:
+      - shared-ml-network
+    restart: unless-stopped
+    depends_on: []                   # Hadoop y ai-service deben estar levantados antes
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  n8n_data:
+
+networks:
+  shared-ml-network:
+    external: true
