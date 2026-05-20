@@ -21,3 +21,7 @@ python-dotenv==1.0.1
 neo4j
 
 joblib==1.3.2
+
+# PySpark (requiere Java — instalado en el Dockerfile)
+pyspark==3.5.3
+requests==2.32.3

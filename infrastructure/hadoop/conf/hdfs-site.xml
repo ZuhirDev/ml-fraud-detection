@@ -34,4 +34,17 @@
     <name>dfs.namenode.http-address</name>
     <value>0.0.0.0:9870</value>
   </property>
+
+  <!-- CRÍTICO para Docker: el DataNode anuncia su hostname (no su IP interna)
+       así los clientes externos (ml-env, Spark) pueden conectar correctamente -->
+  <property>
+    <name>dfs.datanode.hostname</name>
+    <value>hadoop</value>
+  </property>
+
+  <property>
+    <name>dfs.client.use.datanode.hostname</name>
+    <value>true</value>
+  </property>
+
 </configuration>
