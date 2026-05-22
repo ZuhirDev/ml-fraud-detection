@@ -27,7 +27,7 @@ variable "repo_url" {
 variable "repo_branch" {
   description = "Rama de GitHub a clonar en la EC2"
   type        = string
-  default     = "feature/hadoop"
+  default     = "main"
 }
 
 variable "model_s3_path" {

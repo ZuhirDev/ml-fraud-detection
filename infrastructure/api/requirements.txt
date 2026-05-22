@@ -3,11 +3,11 @@
 python-dotenv==1.0.1
 
 # Neo4j (si se utiliza desde la infraestructura)
-neo4j
+neo4j>=5.0.0
 
 pandas==2.2.2
 scikit-learn==1.5.0
-
+pydantic>=1.10.0,<2.0.0
 
 # API server
 fastapi==0.95.2

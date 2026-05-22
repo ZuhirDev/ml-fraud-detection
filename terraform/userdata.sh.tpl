@@ -30,7 +30,7 @@ echo "========================================"
 echo " [3/6] Configurando .env"
 echo "========================================"
 cat > /home/ubuntu/app/.env << 'ENVEOF'
-MODEL_NAME=modelo_fraude_rf_final.joblib
+MODEL_NAME=modelo_arbol_optimizado.pkl
 NEO4J_AUTH=neo4j/password
 NEO4J_USER=neo4j
 NEO4J_PASSWORD=password
