@@ -1,4 +1,302 @@
-# Despliegue en AWS — Plan con Terraform
+# Despliegue en AWS — Guía Completa con Terraform
+
+> TFG: Sistema de Detección de Fraude Bancario  
+> Cuenta: AWS Academy (laboratorio, región `us-east-1`)
+
+---
+
+## Arquitectura
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│  EC2  t3.large  (2 vCPU · 8 GB RAM · 30 GB gp3)                │
+│                                                                 │
+│  shared-ml-network (Docker bridge)                             │
+│  ├── ml-env      JupyterLab        :8888                        │
+│  ├── ai-service  FastAPI /predict  :8000                        │
+│  ├── neo4j       Graph DB          :7474 / :7687                │
+│  ├── hadoop      HDFS + YARN       :9870 / :9000                │
+│  └── n8n         Workflows         :5678                        │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+Todo el stack se levanta automáticamente al arrancar la EC2 vía `user_data`.  
+El repo se clona en `/home/ubuntu/app`.
+
+---
+
+## Limitaciones de AWS Academy
+
+| Limitación | Detalle |
+|---|---|
+| Solo `us-east-1` | Región fija, no se puede cambiar |
+| No crear IAM users/roles | Se usa el rol `LabInstanceProfile` preexistente |
+| Sesiones de ~4 h | Las credenciales AWS caducan; hay que renovarlas |
+| $50 de crédito | Solo encender para demos y trabajo activo |
+| Key Pair se pierde | Si el lab se reinicia desde cero, hay que recrearlo |
+
+---
+
+## 1. Instalar Terraform
+
+Solo hay que hacerlo una vez en tu máquina.
+
+**Windows (PowerShell con winget):**
+```powershell
+winget install HashiCorp.Terraform
+# Reiniciar PowerShell, luego verificar:
+terraform -v
+```
+
+**Windows (manual, si winget no funciona):**
+1. Ir a https://developer.hashicorp.com/terraform/install
+2. Descargar el ZIP para Windows AMD64
+3. Extraer `terraform.exe` y moverlo a `C:\Windows\System32\` (o a cualquier carpeta en el PATH)
+4. Verificar: `terraform -v`
+
+**Linux/Debian (PC de clase):**
+```bash
+wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip
+unzip terraform_*.zip
+sudo mv terraform /usr/local/bin/
+terraform -v
+```
+
+---
+
+## 2. Pegar credenciales de AWS Academy
+
+Cada vez que abras un terminal nuevo o caduquen las claves (~4 h):
+
+1. **AWS Academy** → **AWS Details** → **Show**
+2. Copia los tres valores y pégalos en PowerShell:
+
+```powershell
+$env:AWS_ACCESS_KEY_ID     = "ASIA..."
+$env:AWS_SECRET_ACCESS_KEY = "..."
+$env:AWS_SESSION_TOKEN     = "..."
+$env:AWS_DEFAULT_REGION    = "us-east-1"
+```
+
+> Las variables solo duran mientras el terminal está abierto. Si cierras PowerShell, hay que repetir este paso.
+
+---
+
+## 3. Crear el Key Pair (solo la primera vez o si el lab se reinició)
+
+1. Consola AWS → **EC2** → **Key Pairs** → **Create key pair**
+2. Nombre: `claves-ml` · Tipo: RSA · Formato: `.pem`
+3. Se descarga automáticamente `claves-ml.pem`
+4. Moverlo a `C:\Users\Javi\.ssh\claves-ml.pem`
+5. En Linux/Mac: `chmod 600 ~/.ssh/claves-ml.pem`
+
+> En Windows no hace falta el `chmod`. Si SSH da error de permisos:
+> ```powershell
+> icacls "$env:USERPROFILE\.ssh\claves-ml.pem" /inheritance:r /grant:r "$($env:USERNAME):(R)"
+> ```
+
+---
+
+## 4. Primer despliegue (crear la EC2 desde cero)
+
+```powershell
+# Desde la raíz del proyecto
+cd terraform
+
+# Inicializar (descarga el provider de AWS)
+terraform init
+
+# Ver qué va a crear (sin ejecutar nada)
+terraform plan -var="key_pair_name=claves-ml"
+
+# Desplegar
+terraform apply -var="key_pair_name=claves-ml"
+# Escribe "yes" cuando lo pida
+```
+
+Terraform muestra al terminar (~2 min):
+```
+ec2_public_ip = "X.X.X.X"
+ssh_command   = "ssh -i ~/.ssh/claves-ml.pem ubuntu@X.X.X.X"
+services = {
+  api_docs  = "http://X.X.X.X:8000/docs"
+  jupyter   = "http://X.X.X.X:8888"
+  n8n       = "http://X.X.X.X:5678"
+  neo4j     = "http://X.X.X.X:7474"
+  ...
+}
+```
+
+Guarda la IP — cambia cada vez que destruyes y recreas la instancia.
+
+---
+
+## 5. Monitorizar el arranque automático
+
+La EC2 instala Docker y levanta todos los contenedores automáticamente.  
+El proceso tarda **~5-10 minutos** la primera vez.
+
+```powershell
+# Ver el log de arranque en tiempo real (sustituir IP):
+ssh -i "$env:USERPROFILE\.ssh\claves-ml.pem" ubuntu@<IP> "sudo tail -f /var/log/user-data.log"
+```
+
+Cuando aparezca `DONE — Stack levantado correctamente`, todos los servicios están listos.
+
+Verificar que los 5 contenedores están arriba:
+```bash
+# Desde dentro de la EC2:
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+Resultado esperado:
+```
+NAMES        STATUS
+hadoop       Up (healthy)
+ai-service   Up
+ml-env       Up
+neo4j        Up
+n8n          Up
+```
+
+---
+
+## 6. Conectar por SSH
+
+```powershell
+# Windows PowerShell:
+ssh -i "$env:USERPROFILE\.ssh\claves-ml.pem" ubuntu@<IP>
+
+# Linux/Mac:
+ssh -i ~/.ssh/claves-ml.pem ubuntu@<IP>
+```
+
+El proyecto está en `/home/ubuntu/app`.
+
+---
+
+## 7. Importar el workflow de n8n (primera vez)
+
+Una vez dentro de la EC2 y con n8n arriba, desde tu navegador:
+
+1. Abrir `http://<IP>:5678`
+2. Menú superior → **Import from file**
+3. Subir `workflows/informe_fraude_diario.json` (está en el repo)
+4. Configurar las 3 credenciales (n8n te avisa cuáles faltan):
+   - **Neo4j Basic Auth** → Header `Authorization: Basic bmVvNGo6cGFzc3dvcmQ=`
+   - **Groq API Key** → Header `Authorization: Bearer gsk_...`
+   - **SMTP Gmail** → Host `smtp.gmail.com`, Port `465`, SSL/TLS, App Password
+
+> Las URLs internas (`neo4j:7474`, `ai-service:8000`) son iguales que en local — misma red Docker.
+
+---
+
+## 8. Relanzar instancia existente (lab reiniciado, EC2 parada)
+
+Si la EC2 sigue existiendo pero estaba parada:
+
+```powershell
+# 1. Obtener la nueva IP (cambia cada vez que se para/inicia):
+aws ec2 describe-instances `
+  --filters "Name=tag:Name,Values=fraud-detection-server" `
+  --query "Reservations[].Instances[].PublicIpAddress" `
+  --output text
+
+# 2. Iniciar la instancia si está parada:
+aws ec2 start-instances --instance-ids <INSTANCE_ID>
+
+# 3. Conectar por SSH (esperar ~1 min a que arranque):
+ssh -i "$env:USERPROFILE\.ssh\claves-ml.pem" ubuntu@<IP>
+```
+
+Dentro de la EC2, los contenedores deberían haber arrancado solos (`restart: unless-stopped`).  
+Si falta alguno:
+
+```bash
+cd /home/ubuntu/app
+
+# Actualizar código:
+git pull
+
+# Levantar lo que falte:
+docker network create shared-ml-network 2>/dev/null || true
+docker compose -f infrastructure/hadoop/docker-compose.yml  up -d
+docker compose -f infrastructure/api/docker-compose.yml     up -d
+docker compose -f infrastructure/ml-env/docker-compose.yml  up -d
+docker compose -f infrastructure/n8n/docker-compose.yml     up -d
+
+# Verificar:
+docker ps --format "table {{.Names}}\t{{.Status}}"
+```
+
+---
+
+## 9. Apagar para no gastar crédito
+
+**Opción A — Parar la instancia (conserva datos, cobra EBS ~$0.08/día):**
+```powershell
+aws ec2 stop-instances --instance-ids <INSTANCE_ID>
+```
+
+**Opción B — Destruir todo (no cobra nada, pero hay que desplegar de nuevo):**
+```powershell
+cd terraform
+terraform destroy -var="key_pair_name=claves-ml"
+# Escribe "yes"
+```
+
+> Con $50 de crédito y `t3.large` a $0.083/h tienes ~600 horas. Más que suficiente para el TFG.
+
+---
+
+## Estructura Terraform
+
+```
+terraform/
+├── main.tf          # Provider AWS + backend S3 opcional
+├── variables.tf     # key_pair_name, instance_type, repo_url...
+├── ec2.tf           # EC2 + Security Group + user_data
+├── s3.tf            # Bucket S3 para Terraform state
+├── outputs.tf       # IP, URLs, comando SSH
+└── userdata.sh.tpl  # Script de inicio: instala Docker, clona repo, levanta stack
+```
+
+El `user_data` hace automáticamente:
+1. Instala Docker + Git
+2. Clona el repo en `/home/ubuntu/app`
+3. Crea el `.env` con `MODEL_NAME=modelo_arbol_optimizado.pkl`
+4. Crea la red `shared-ml-network`
+5. Levanta hadoop → api → ml-env → n8n
+
+---
+
+## Solución de problemas
+
+### "No valid credential sources found"
+Las credenciales AWS han caducado. Vuelve a AWS Academy → AWS Details y repega los `$env:`.
+
+### Key Pair desaparecido (lab reiniciado desde cero)
+El lab se reinició completamente. Crea un nuevo Key Pair en la consola AWS (ver paso 3) y haz `terraform destroy` + `terraform apply` para recrear la EC2 con el nuevo key pair.
+
+### Contenedor caído
+```bash
+docker logs <nombre_contenedor> --tail 50
+docker compose -f infrastructure/<servicio>/docker-compose.yml up -d
+```
+
+### n8n: "secure cookie" al abrir por HTTP
+Ya está corregido en el compose (`N8N_SECURE_COOKIE=false`). Si persiste:
+```bash
+cd /home/ubuntu/app/infrastructure/n8n
+docker compose down && docker compose up -d
+```
+
+### Neo4j: fallo de credenciales
+```bash
+cd /home/ubuntu/app/infrastructure/ml-env
+docker compose --env-file ../../.env down
+docker compose --env-file ../../.env up -d
+```
 
 > TFG: Sistema de Detección de Fraude Bancario  
 > Cuenta: AWS Academy (laboratorio $50, región `us-east-1`)

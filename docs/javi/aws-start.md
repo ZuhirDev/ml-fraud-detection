@@ -50,15 +50,24 @@ terraform apply   # confirmar con "yes"
 
 Terraform imprime al terminar la IP pública y todas las URLs. Guarda la IP.
 
-### 3. Monitorizar el arranque (~15-20 min primera vez)
+### 3. Monitorizar el arranque (~5-10 min primera vez)
 
 ```powershell
 ssh -i "$env:USERPROFILE\.ssh\claves-ml.pem" ubuntu@<IP> "sudo tail -f /var/log/user-data.log"
 ```
 
-Cuando veas `DONE — Stack levantado`, todos los contenedores están arriba.
+Cuando veas `DONE — Stack levantado correctamente`, todos los contenedores están arriba.
 
-### 4. Instalar Terraform en Debian/Linux (PC de clase)
+### 4. Importar el workflow de n8n
+
+1. Abrir `http://<IP>:5678`
+2. Menú superior → **Import from file** → subir `workflows/informe_fraude_diario.json`
+3. Configurar las 3 credenciales que pedirá:
+   - **Neo4j Basic Auth**: `Authorization: Basic bmVvNGo6cGFzc3dvcmQ=`
+   - **Groq API Key**: `Authorization: Bearer gsk_...`
+   - **SMTP Gmail**: host `smtp.gmail.com`, port `465`, SSL/TLS, App Password
+
+### 5. Instalar Terraform en Debian/Linux (PC de clase)
 
 ```bash
 wget https://releases.hashicorp.com/terraform/1.9.8/terraform_1.9.8_linux_amd64.zip

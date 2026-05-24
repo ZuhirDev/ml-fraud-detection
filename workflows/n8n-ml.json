@@ -1,0 +1,224 @@
+{
+  "name": "n8n-ml",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        16,
+        -96
+      ],
+      "id": "581f68ce-a424-49b8-8ef4-23395bf43131",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://neo4j:7474/db/neo4j/tx/commit",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Authorization",
+              "value": "Basic bmVvNGo6cGFzc3dvcmQ="
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"statements\": [\n    {\n      \"statement\": \"MATCH ()-[t:TRANSACTION]->() RETURN count(t) AS total, sum(CASE WHEN t.isFraud = 1 THEN 1 ELSE 0 END) AS fraudes, round(sum(CASE WHEN t.isFraud = 1 THEN t.amount ELSE 0.0 END)) AS importe_fraude, max(t.step) AS ultimo_step\"\n    },\n    {\n      \"statement\": \"MATCH ()-[t:TRANSACTION]->() WHERE t.isFraud = 1 RETURN t.type AS tipo, count(t) AS cantidad ORDER BY cantidad DESC LIMIT 3\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        208,
+        0
+      ],
+      "id": "b2b69819-8f59-4276-a0f1-4ec106655655",
+      "name": "HTTP Request"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        16,
+        96
+      ],
+      "id": "ea602bb9-785f-4a20-aeb9-4d09dfbc309d",
+      "name": "When clicking ‘Execute workflow’"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.groq.com/openai/v1/chat/completions",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"model\": \"llama-3.1-8b-instant\",\n  \"max_tokens\": 400,\n  \"messages\": [\n    {\n      \"role\": \"system\",\n      \"content\": \"Eres un analista experto en ciberseguridad financiera. Redactas informes ejecutivos concisos, profesionales y en español. Usas datos reales del sistema para dar contexto y recomendaciones.\"\n    },\n    {\n      \"role\": \"user\",\n      \"content\": \"Genera un informe ejecutivo breve (2-3 párrafos) para el sistema de detección de fraude bancario.\\n\\nDatos del sistema a {{ $json.fecha }}:\\n- Transacciones analizadas en total: {{ $json.total }}\\n- Fraudes detectados: {{ $json.fraudes }} ({{ $json.porcentaje }}% del total)\\n- Importe total fraudulento interceptado: ${{ $json.importe }}\\n- Último paso temporal procesado: {{ $json.ultimo_step }}\\n- Fraude por tipo de operación: {{ $json.tipos_str }}\\n\\nIncluye: situación actual, patrones detectados y una recomendación operativa.\"\n    }\n  ]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        624,
+        0
+      ],
+      "id": "24bd0c99-f48c-49f7-b201-9d09ba5a5e6c",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "xvxFS774eDJdF5q1",
+          "name": "OpenAI API Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "poempolo7@gmail.com",
+        "toEmail": "poempolo7@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "html": "={{ $json.html }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1040,
+        0
+      ],
+      "id": "fffa3f37-5282-4ff8-b2b9-fed8360bc570",
+      "name": "Send an Email",
+      "webhookId": "8450be8c-7c95-409e-a50e-3849b4affb35",
+      "credentials": {
+        "smtp": {
+          "id": "9SNhanQwSskB0pfP",
+          "name": "Credential for SMTP"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const analisis = $input.first().json.choices[0].message.content;\nconst {\n  total, fraudes, porcentaje, importe, fecha, tipos, ultimo_step\n} = $('Stats').first().json;\n\nconst tipos_html = tipos.map(t =>\n  `<tr><td style=\"padding:8px 16px;\">${t.tipo}</td><td style=\"padding:8px 16px;font-weight:bold;\">${t.cantidad}</td></tr>`\n).join('');\n\nconst html = `\n<!DOCTYPE html>\n<html lang=\"es\">\n<head><meta charset=\"UTF-8\">\n<style>\n  body { font-family: Arial, sans-serif; background: #f4f4f4; margin: 0; padding: 20px; }\n  .card { background: white; border-radius: 8px; padding: 24px; margin-bottom: 16px; box-shadow: 0 2px 4px rgba(0,0,0,0.08); }\n  .header { background: #1a1a2e; color: white; border-radius: 8px; padding: 24px; margin-bottom: 16px; }\n  .metric { display: inline-block; text-align: center; margin: 0 16px; }\n  .metric .value { font-size: 2em; font-weight: bold; color: #e63946; }\n  .metric .label { font-size: 0.85em; color: #666; margin-top: 4px; }\n  .metric.safe .value { color: #2a9d8f; }\n  table { width: 100%; border-collapse: collapse; }\n  th { background: #1a1a2e; color: white; padding: 10px 16px; text-align: left; }\n  tr:nth-child(even) { background: #f8f8f8; }\n  .ai-box { background: #f0f4ff; border-left: 4px solid #4361ee; padding: 16px 20px; border-radius: 0 8px 8px 0; }\n  .footer { text-align: center; color: #aaa; font-size: 0.8em; margin-top: 24px; }\n</style>\n</head>\n<body>\n  <div class=\"header\">\n    <h1 style=\"margin:0\">Sistema de Detección de Fraude Bancario</h1>\n    <p style=\"margin:8px 0 0;opacity:0.8\">Informe generado: ${fecha} · Paso temporal: ${ultimo_step}</p>\n  </div>\n\n  <div class=\"card\" style=\"text-align:center\">\n    <div class=\"metric\">\n      <div class=\"value safe\">${Number(total).toLocaleString('es-ES')}</div>\n      <div class=\"label\">Transacciones analizadas</div>\n    </div>\n    <div class=\"metric\">\n      <div class=\"value\">${Number(fraudes).toLocaleString('es-ES')}</div>\n      <div class=\"label\">Fraudes detectados</div>\n    </div>\n    <div class=\"metric\">\n      <div class=\"value\">${porcentaje}%</div>\n      <div class=\"label\">Tasa de fraude</div>\n    </div>\n    <div class=\"metric\">\n      <div class=\"value\">$${Number(importe).toLocaleString('es-ES')}</div>\n      <div class=\"label\">Importe interceptado</div>\n    </div>\n  </div>\n\n  <div class=\"card\">\n    <h2 style=\"margin-top:0\">Fraude por tipo de operación</h2>\n    <table>\n      <tr><th>Tipo</th><th>Casos</th></tr>\n      ${tipos_html || '<tr><td colspan=\"2\" style=\"padding:8px 16px;color:#999\">Sin datos disponibles</td></tr>'}\n    </table>\n  </div>\n\n  <div class=\"card\">\n    <h2 style=\"margin-top:0\">Análisis generado por IA</h2>\n    <div class=\"ai-box\">\n      ${analisis.replace(/\\n/g, '<br>')}\n    </div>\n  </div>\n\n  <div class=\"footer\">\n    Generado automáticamente por el sistema de fraude · TFG 2025-2026\n  </div>\n</body>\n</html>\n`;\n\nreturn [{ json: { html, subject: `Informe de Fraude — ${fecha} · ${fraudes} fraudes detectados` } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        832,
+        0
+      ],
+      "id": "66aaaf45-2675-48be-b965-d2e89d4a7645",
+      "name": "emailFormatter"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extraer datos de la respuesta de Neo4j\nconst results = $input.first().json.results;\n\n// Estadísticas globales (primera query)\nconst row0 = results[0].data[0]?.row ?? [0, 0, 0, 0];\nconst total    = row0[0];\nconst fraudes  = row0[1];\nconst importe  = row0[2];\nconst ultimo_step = row0[3];\nconst porcentaje = total > 0 ? ((fraudes / total) * 100).toFixed(3) : '0';\n\n// Top 3 tipos de fraude (segunda query)\nconst tipos = (results[1].data ?? []).map(d => ({\n  tipo: d.row[0],\n  cantidad: d.row[1]\n}));\nconst tipos_str = tipos.map(t => `${t.tipo}: ${t.cantidad}`).join(', ') || 'Sin datos';\n\nconst fecha = new Date().toLocaleDateString('es-ES', {\n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'\n});\n\nreturn [{\n  json: {\n    total,\n    fraudes,\n    importe,\n    porcentaje,\n    ultimo_step,\n    tipos_str,\n    tipos,\n    fecha\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        0
+      ],
+      "id": "6b4c5fb2-8db3-4288-a3a1-3c9a5b75b0e1",
+      "name": "Stats"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Stats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "When clicking ‘Execute workflow’": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request1": {
+      "main": [
+        [
+          {
+            "node": "emailFormatter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "emailFormatter": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Stats": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "eea3c36a-8a4e-4c15-a3ed-27f2144e6b98",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aba13ca4a58d61f84a2083c93398119f7d6a31864e39cb0020235f83cadf2d0d"
+  },
+  "id": "PTvdWvAxh3q9rP57",
+  "tags": []
+}

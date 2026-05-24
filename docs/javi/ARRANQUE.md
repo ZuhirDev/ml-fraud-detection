@@ -128,4 +128,6 @@ NEO4J_AUTH=neo4j/password
 ## Documentación detallada
 
 - [HADOOP.md](HADOOP.md) — Configuración HDFS, estructura de directorios, troubleshooting
-- [N8N.md](N8N.md) — Workflows planificados, configuración SMTP, URLs internas
+- [N8N.md](N8N.md) — Workflow de informe diario con Groq + Neo4j + email HTML, configuración SMTP, credenciales
+- [AWS.md](AWS.md) — Despliegue completo en AWS: instalar Terraform, crear EC2, SSH, gestión de contenedores
+- [aws-start.md](aws-start.md) — Guía rápida de arranque: nuevo despliegue vs relanzar instancia existente
