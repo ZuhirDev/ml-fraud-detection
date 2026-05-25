@@ -36,8 +36,7 @@ El resultado es un conjunto de 16 features que alimentan el modelo, donde las 6 
 ## 2. Dataset: PaySim
 
 **Fuente:** Kaggle — `ealaxi/paysim1`  
-**Tamaño completo:** 6,3 millones de transacciones · ~470 MB en CSV  
-**Entorno de desarrollo:** ~872 000 registros (~14% del total, por limitaciones de disco)
+**Tamaño completo:** 6,3 millones de transacciones · ~470 MB en CSV
 
 PaySim es una simulación sintética generada con datos reales de un banco de Africa Oriental. Simula transacciones de dinero móvil durante 30 días (744 pasos temporales, donde cada `step` representa una hora).
 
@@ -107,26 +106,6 @@ shared-ml-network (Docker bridge)
 └── n8n ─────────── Motor de automatización
     Puerto 5678 (interfaz web + API)
     Workflows guardados en volumen persistente n8n_data
-```
-
-### Comunicación entre servicios
-
-```
-[ml-env notebook]
-    │  neo4j-driver (Bolt: neo4j:7687)
-    ▼
-[neo4j]
-    │
-    └─────────────────────────────────
-                                     │
-[n8n]                                │
-    │  HTTP POST neo4j:7474/db/...   │
-    └──────────────────────────────►[neo4j]
-
-[ai-service]
-    │  carga modelo del volumen /models
-    │  recibe peticiones POST /predict
-    └──────────► devuelve { fraud_probability, is_fraud }
 ```
 
 ---
@@ -274,8 +253,6 @@ Para problemas con clases muy desbalanceadas, la métrica correcta es **PR-AUC**
 
 **Sobre el Recall vs Precision:** En detección de fraude, el coste de un falso negativo (no detectar un fraude real) es mucho mayor que el de un falso positivo (alertar sobre una transacción legítima). Por eso se prioriza maximizar el recall aunque la precisión sea baja. Las alertas se revisan manualmente o con un segundo filtro.
 
-**Sobre los resultados actuales:** Los valores de PR-AUC son bajos porque el entorno de desarrollo usa solo ~872 000 de los 6,3 millones de registros de PaySim. Con el dataset completo, la distribución de fraude es más representativa y el modelo aprende patrones más robustos. El umbral de clasificación también puede ajustarse según el coste operativo deseado.
-
 ---
 
 ## 7. Microservicio de predicción (FastAPI)
@@ -405,7 +382,7 @@ Envía un prompt al modelo `llama-3.1-8b-instant` de Groq con los datos estadís
 Construye un email HTML completo con: cabecera con el nombre del sistema, cuatro tarjetas de métricas (transacciones, fraudes, tasa %, importe interceptado), tabla de fraude por tipo y el análisis generado por la IA con un estilo visual diferenciado.
 
 **Nodo 7 — Send Email**  
-Envía el email vía Gmail SMTP (puerto 465, SSL/TLS) usando una App Password de Google (no la contraseña de la cuenta). El asunto incluye dinámicamente la fecha y el número de fraudes detectados.
+Envía el email vía Gmail SMTP (puerto 587, STARTTLS) usando una App Password de Google (no la contraseña de la cuenta). El asunto incluye dinámicamente la fecha y el número de fraudes detectados.
 
 ---
 
@@ -551,235 +528,3 @@ ml-fraud-detection/
 | Dataset | PaySim | — | 6,3M transacciones sintéticas de Mobile Money |
 
 ---
-
-## 1. Descripción del proyecto
-
-Sistema end-to-end de detección de fraude en transacciones bancarias. Combina Machine Learning con análisis de grafos para identificar patrones de comportamiento fraudulento que los sistemas basados en reglas no pueden capturar. El resultado se expone como microservicio REST y se monitoriza mediante informes automáticos generados con IA.
-
-**Problema a resolver:** El 0,13 % de las transacciones son fraude, pero representan pérdidas económicas significativas. La detección tardía o basada en reglas estáticas genera muchos falsos negativos. El reto es detectar transacciones sospechosas en tiempo real con alta sensibilidad (recall), aceptando cierta imprecisión para no bloquear transacciones legítimas.
-
-**Dataset:** PaySim — simulación sintética de transacciones bancarias móviles basada en datos reales de un banco africano. 6,3 millones de registros (el entorno de desarrollo trabaja con ~872 000 por limitaciones de disco).
-
----
-
-## 2. Arquitectura del sistema
-
-Todos los servicios corren en Docker sobre una red compartida (`shared-ml-network`). La misma configuración funciona en local y en AWS sin cambios.
-
-```
-shared-ml-network
-│
-├── neo4j          Graph DB · puerto 7474 (HTTP) / 7687 (Bolt)
-│                  Almacena transacciones como relaciones TRANSACTION
-│                  Calcula PageRank, grado y comunidades Louvain
-│
-├── ml-env         JupyterLab · puerto 8888
-│                  Pipeline de datos: ingesta → features → entrenamiento
-│
-├── ai-service     FastAPI · puerto 8000
-│                  Microservicio de predicción: POST /predict
-│                  Carga el modelo .pkl y devuelve probabilidad de fraude
-│
-├── hadoop         HDFS + YARN · puerto 9870 (NameNode UI)
-│                  Almacenamiento distribuido del dataset original (CSV)
-│                  Base para procesamiento PySpark a escala
-│
-└── n8n            Automatización · puerto 5678
-                   Workflow diario: Neo4j → Groq IA → email HTML
-```
-
----
-
-## 3. Pipeline de datos (flujo completo)
-
-```
-[CSV PaySim]
-    │
-    ▼
-[Hadoop HDFS]          ← Almacenamiento distribuido del raw
-    │
-    ▼
-[Neo4j]                ← Ingesta de transacciones como grafo
-    │  Nodos: Account (nameOrig, nameDest)
-    │  Relaciones: TRANSACTION (amount, isFraud, type, step, ...)
-    │
-    ▼
-[Graph Features]       ← Cálculo de métricas topológicas
-    │  PageRank de origen y destino
-    │  Grado de entrada/salida
-    │  Comunidades Louvain (detección de clusters)
-    │
-    ▼
-[master_dataset_v2.csv.gz]  ← Dataset enriquecido con features de grafo
-    │
-    ▼
-[Entrenamiento ML]     ← fraud_detection_v2.ipynb
-    │  División temporal: 80% train / 20% test (por step)
-    │  Algoritmos: Random Forest, Decision Tree, XGBoost, Logistic Regression
-    │  Optimización de hiperparámetros con GridSearchCV
-    │  Métrica objetivo: PR-AUC (precision-recall, mejor para clases desbalanceadas)
-    │
-    ▼
-[modelo_arbol_optimizado.pkl]  ← Modelo guardado en /models/
-    │
-    ▼
-[FastAPI /predict]     ← Inferencia en tiempo real
-```
-
----
-
-## 4. Feature engineering con grafos
-
-El valor diferencial del proyecto frente a un modelo tabular estándar está en las variables derivadas del grafo de Neo4j. Estas capturan el comportamiento relacional de las cuentas:
-
-| Feature | Qué mide | Por qué detecta fraude |
-|---|---|---|
-| `orig_pagerank` | Influencia de la cuenta origen en la red | Cuentas fraudulentas suelen ser hubs de alta conectividad |
-| `dest_pagerank` | Influencia de la cuenta destino | Receptores recurrentes de fondos sospechosos |
-| `orig_out_degree` | Nº de transacciones enviadas por origen | Cuentas "mulas" envían a muchos destinos en poco tiempo |
-| `dest_in_degree` | Nº de transacciones recibidas por destino | Destinos que concentran fondos de muchos orígenes |
-| `orig_community` | Comunidad Louvain del origen | El fraude tiende a operar en clusters cerrados |
-| `dest_community` | Comunidad Louvain del destino | Permite detectar si origen y destino comparten red criminal |
-
-Estas 6 features se añaden a las 10 features base (amount, balances, tipo de operación codificado en one-hot) → **16 features totales**.
-
----
-
-## 5. Modelo de Machine Learning
-
-**Algoritmo seleccionado:** Decision Tree optimizado (`modelo_arbol_optimizado.pkl`)  
-**Librería:** scikit-learn  
-**Clase desbalanceada:** ~0,13% de fraudes → se usa `class_weight='balanced'`
-
-**División temporal:** los datos de entrenamiento y test se separan por `step` (unidad temporal del dataset), no aleatoriamente. Esto simula un escenario real donde el modelo se entrena con datos históricos y se evalúa con datos futuros.
-
-**Métricas relevantes** (con el subconjunto de ~872 000 registros):
-- PR-AUC: 0.15 (baja por el subconjunto; con el dataset completo de 6,3M mejora significativamente)
-- Recall: 0.84 — detecta el 84% de los fraudes reales
-- Precision: 0.009 — hay falsos positivos (aceptable en detección de fraude: mejor revisar más que perder un fraude real)
-
-**Nota sobre el modelo y el dataset:** Los resultados actuales corresponden al subconjunto de desarrollo (~14% del PaySim completo). Cargar el dataset completo (6,3M filas) mejora drásticamente todas las métricas.
-
----
-
-## 6. API de predicción (FastAPI)
-
-**Endpoint:** `POST http://localhost:8000/predict`
-
-Recibe un JSON con las 16 features de una transacción y devuelve la probabilidad de fraude y la clasificación binaria.
-
-```json
-// Request
-{
-  "amount": 500.0,
-  "oldbalanceOrg": 10000.0,
-  "newbalanceOrig": 9500.0,
-  "oldbalanceDest": 0.0,
-  "newbalanceDest": 500.0,
-  "type_CASH_OUT": 1,
-  "type_TRANSFER": 0,
-  "orig_out_degree": 5,
-  "dest_in_degree": 3,
-  "orig_pagerank": 0.01,
-  "dest_pagerank": 0.005,
-  "orig_community": 1,
-  "dest_community": 2
-}
-
-// Response
-{
-  "fraud_probability": 0.87,
-  "is_fraud": true
-}
-```
-
----
-
-## 7. Automatización con n8n
-
-Workflow implementado en `workflows/informe_fraude_diario.json`:
-
-```
-[Schedule Trigger: 08:00]  ─┐
-                             ├─→ Neo4j (HTTP API) ─→ Code (formatear)
-[Manual Trigger]            ─┘
-                                  ─→ Groq API (llama-3.1-8b-instant)
-                                  ─→ Code (construir HTML)
-                                  ─→ Send Email (Gmail SMTP)
-```
-
-**Lo que hace cada nodo:**
-1. **Triggers**: disparo diario automático o manual para demos
-2. **Neo4j HTTP Request**: consulta estadísticas reales con dos queries Cypher (totales + desglose por tipo de operación)
-3. **Code (Stats)**: extrae y formatea los datos del formato de respuesta de Neo4j
-4. **Groq HTTP Request**: envía los datos al modelo `llama-3.1-8b-instant` para generar un párrafo de análisis ejecutivo en español
-5. **Code (HTML)**: construye un email HTML con tarjetas de métricas, tabla de fraude por tipo y el análisis de IA
-6. **Send Email**: envía el informe por Gmail SMTP (puerto 465, SSL/TLS)
-
----
-
-## 8. Infraestructura en AWS
-
-**Tecnología:** Terraform + AWS Academy  
-**Instancia:** EC2 `t3.large` (2 vCPU, 8 GB RAM, 30 GB gp3) · región `us-east-1`
-
-Terraform provisiona automáticamente:
-- La instancia EC2 con Ubuntu 22.04
-- Security Group con los puertos necesarios (22, 7474, 7687, 8000, 8088, 8888, 9870, 5678)
-- Bucket S3 para el Terraform state
-
-Al arrancar la EC2, el script `userdata.sh.tpl` ejecuta automáticamente:
-1. Instala Docker y Git
-2. Clona el repositorio en `/home/ubuntu/app`
-3. Crea la red Docker `shared-ml-network`
-4. Levanta todo el stack con `docker compose`
-
-El workflow de n8n se importa manualmente una vez en `http://<EC2_IP>:5678` y las URLs internas (`neo4j`, `ai-service`) funcionan igual que en local.
-
----
-
-## 9. Notebooks del pipeline
-
-| Notebook | Propósito |
-|---|---|
-| `datasetfinal_v1.ipynb` | Ingesta CSV → Neo4j → cálculo de graph features → exporta `master_dataset_v2.csv.gz` |
-| `fraud_detection_v2.ipynb` | Carga `master_dataset_v2.csv.gz` → entrena modelos → guarda `modelo_arbol_optimizado.pkl` |
-| `hadoop_pyspark_ingesta.ipynb` | Carga datos desde HDFS con PySpark (procesamiento a escala) |
-
----
-
-## 10. Estructura del repositorio
-
-```
-ml-fraud-detection/
-├── infrastructure/
-│   ├── ml-env/         Docker: JupyterLab + librerías ML
-│   ├── api/            Docker: FastAPI de predicción
-│   ├── hadoop/         Docker: HDFS + YARN
-│   └── n8n/            Docker: automatización de workflows
-├── notebooks/          Pipeline de datos y entrenamiento
-├── src/                Código fuente de la API (main.py)
-├── models/             Modelo entrenado (.pkl)
-├── workflows/          JSON del workflow de n8n
-├── terraform/          Infraestructura como código (AWS)
-├── data/               Datos locales (procesados)
-└── docs/               Documentación técnica
-```
-
----
-
-## 11. Tecnologías utilizadas
-
-| Categoría | Tecnología | Uso |
-|---|---|---|
-| Lenguaje | Python 3.10 | Todo el stack de datos y API |
-| ML | scikit-learn, XGBoost | Entrenamiento y predicción |
-| Graph DB | Neo4j 2025 Enterprise | Almacenamiento de grafo y feature engineering |
-| Big Data | Hadoop 3.4 + PySpark | Almacenamiento distribuido (HDFS) y procesamiento |
-| API | FastAPI + Uvicorn | Microservicio de inferencia |
-| Automatización | n8n | Workflows: informes automáticos con IA |
-| IA Generativa | Groq (llama-3.1-8b-instant) | Análisis narrativo en informes por email |
-| Contenedores | Docker + Docker Compose | Orquestación local y en AWS |
-| IaC | Terraform | Provisión de infraestructura en AWS |
-| Cloud | AWS EC2 + S3 (Academy) | Despliegue en producción |
-| Dataset | PaySim (Kaggle) | Transacciones bancarias sintéticas |
