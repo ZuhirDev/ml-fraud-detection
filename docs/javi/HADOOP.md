@@ -38,23 +38,23 @@ Esto es suficiente para el volumen de datos del TFG y reproduce la misma arquite
 ┌────────────────────────────────────────────────────────┐
 │                  Contenedor Hadoop                     │
 │                                                        │
-│   ┌──────────────┐         ┌──────────────────────┐   │
-│   │   NameNode   │         │      DataNode        │   │
-│   │              │         │                      │   │
-│   │ Metadatos:   │◄───────►│  Bloques de datos    │   │
-│   │ - árbol de   │         │  (ficheros reales)   │   │
-│   │   directorios│         │                      │   │
-│   │ - ubicación  │         └──────────────────────┘   │
+│   ┌──────────────┐         ┌──────────────────────┐    │
+│   │   NameNode   │         │      DataNode        │    │
+│   │              │         │                      │    │
+│   │ Metadatos:   │◄───────►│  Bloques de datos    │    │
+│   │ - árbol de   │         │  (ficheros reales)   │    │
+│   │   directorios│         │                      │    │
+│   │ - ubicación  │         └──────────────────────┘    │
 │   │   de bloques │                                     │
 │   └──────────────┘                                     │
 │                                                        │
-│   ┌──────────────────┐     ┌──────────────────────┐   │
-│   │ ResourceManager  │     │    NodeManager       │   │
-│   │  (YARN)          │◄───►│    (YARN)            │   │
-│   │                  │     │                      │   │
-│   │ Asigna recursos  │     │ Ejecuta containers   │   │
-│   │ a jobs Spark/MR  │     │ de jobs              │   │
-│   └──────────────────┘     └──────────────────────┘   │
+│   ┌──────────────────┐     ┌──────────────────────┐    │
+│   │ ResourceManager  │     │    NodeManager       │    │
+│   │  (YARN)          │◄───►│    (YARN)            │    │
+│   │                  │     │                      │    │
+│   │ Asigna recursos  │     │ Ejecuta containers   │    │
+│   │ a jobs Spark/MR  │     │ de jobs              │    │
+│   └──────────────────┘     └──────────────────────┘    │
 └────────────────────────────────────────────────────────┘
 ```
 
