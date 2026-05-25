@@ -232,8 +232,8 @@ Desde la UI de Hadoop (http://localhost:9870):
 - ~25 MB en uso de 1 TB de capacidad configurada
 - 3 directorios activos bajo `/data/`
 
-Desde el notebook (celda 10):
-```
+Desde el notebook:
+```text
 === Estructura de datos (hdfs://hadoop:9000) ===
 
 /data/raw/
@@ -243,25 +243,19 @@ Desde el notebook (celda 10):
 /data/processed/
   part-00000-....parquet  (X.XX MB)
   _SUCCESS
-
-/data/fraud-results/
-  part-00000-....parquet  (X.XX MB)
-  _SUCCESS
 ```
 
 ---
 
 ## Notebook de referencia
 
-`notebooks/hadoop_pyspark_ingesta.ipynb` — 10 secciones:
+`notebooks/hadoop_pyspark_ingesta.ipynb` — 8 secciones:
 
 1. Instalación de dependencias
-2. Descarga dataset HuggingFace (100k muestreo estratificado)
-3. SparkSession con autodetección HDFS
-4. pandas → parquet temporal → Spark → HDFS raw
-5. Transformaciones y limpieza
-6. Feature engineering para el modelo
-7. Guardar procesados en HDFS
-8. Llamar al API con 5 muestras de prueba
-9. Predicciones en batch (1000 filas) guardadas en HDFS
-10. Verificación final + `spark.stop()`
+2. Configurar rutas para el Dataset local (PaySim)
+3. SparkSession conectada a HDFS
+4. Leer CSV nativo en Spark y guardar en HDFS (raw)
+5. Transformaciones y limpieza de datos
+6. Feature engineering (One-Hot Encoding y renombrado)
+7. Guardar datos procesados en HDFS
+8. Verificación final del estado de HDFS + `spark.stop()`

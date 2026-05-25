@@ -299,9 +299,9 @@ df_procesado.write.mode("overwrite").parquet("hdfs://hadoop:9000/data/processed/
 
 ### Pipeline del notebook de ingesta (`hadoop_pyspark_ingesta.ipynb`)
 
-```
-[1] Descargar dataset (HuggingFace API)
-         │  5M+ filas → sample de 100K para desarrollo
+```text
+[1] Leer dataset (ml_dataset.csv)
+         │  Dataset base desde el volumen montado
          ▼
 [2] Crear SparkSession conectada a HDFS
          │
@@ -309,13 +309,10 @@ df_procesado.write.mode("overwrite").parquet("hdfs://hadoop:9000/data/processed/
 [3] Guardar datos raw en /data/raw/ (Parquet)
          │
          ▼
-[4] Feature engineering con PySpark
-         │  Limpiar nulos, transformar tipos, calcular features derivadas
+[4] Limpieza y transformaciones con PySpark
+         │  Filtrados, tipo base y One-Hot Encoding
          ▼
-[5] Llamar a FastAPI (ai-service:8000/predict) vía pandas UDF
-         │  Batch de predicciones por cada partición del DataFrame
-         ▼
-[6] Guardar predicciones en /data/fraud-results/ (Parquet)
+[5] Guardar datos procesados localmente en /data/processed/ (Parquet)
 ```
 
 ---
