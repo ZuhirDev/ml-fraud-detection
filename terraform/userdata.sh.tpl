@@ -38,7 +38,7 @@ NEO4J_URI=bolt://neo4j:7687
 ENVEOF
 
 echo "========================================"
-echo " [4/6] Descargando modelo desde S3 (si aplica)"
+echo " [4/6] Descargando modelo desde S3 (si hay ruta para S3)"
 echo "========================================"
 %{ if model_s3_path != "" }
 echo "Descargando modelo desde ${model_s3_path} ..."
