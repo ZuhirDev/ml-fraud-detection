@@ -15,10 +15,10 @@
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.3,
       "position": [
-        16,
-        -96
+        400,
+        192
       ],
-      "id": "581f68ce-a424-49b8-8ef4-23395bf43131",
+      "id": "da877b09-2eaf-4fcc-bdb4-2caecc6bc9fe",
       "name": "Schedule Trigger"
     },
     {
@@ -46,10 +46,10 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        208,
-        0
+        592,
+        288
       ],
-      "id": "b2b69819-8f59-4276-a0f1-4ec106655655",
+      "id": "57e0c1f4-0ab5-4153-9b77-89270fddbd0c",
       "name": "HTTP Request"
     },
     {
@@ -57,10 +57,10 @@
       "type": "n8n-nodes-base.manualTrigger",
       "typeVersion": 1,
       "position": [
-        16,
-        96
+        400,
+        384
       ],
-      "id": "ea602bb9-785f-4a20-aeb9-4d09dfbc309d",
+      "id": "086a05bf-52f2-4f05-abc3-c5b886c700c9",
       "name": "When clicking ‘Execute workflow’"
     },
     {
@@ -77,15 +77,15 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.4,
       "position": [
-        624,
-        0
+        1008,
+        288
       ],
-      "id": "24bd0c99-f48c-49f7-b201-9d09ba5a5e6c",
+      "id": "dc7bc152-a160-4998-b0b6-7c9227d6a151",
       "name": "HTTP Request1",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "xvxFS774eDJdF5q1",
-          "name": "OpenAI API Key"
+          "id": "Gg9pNmWYZGdOurE9",
+          "name": "Groq API Key"
         }
       }
     },
@@ -100,16 +100,16 @@
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
       "position": [
-        1040,
-        0
+        1632,
+        288
       ],
-      "id": "fffa3f37-5282-4ff8-b2b9-fed8360bc570",
+      "id": "a95ddd0b-794a-4130-b801-fc0c97f471b8",
       "name": "Send an Email",
       "webhookId": "8450be8c-7c95-409e-a50e-3849b4affb35",
       "credentials": {
         "smtp": {
-          "id": "9SNhanQwSskB0pfP",
-          "name": "Credential for SMTP"
+          "id": "w6P4YHfji5OSN81i",
+          "name": "SMTP account"
         }
       }
     },
@@ -120,10 +120,10 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        832,
-        0
+        1216,
+        288
       ],
-      "id": "66aaaf45-2675-48be-b965-d2e89d4a7645",
+      "id": "9dab63d0-db7c-4588-b139-29db2e912bd5",
       "name": "emailFormatter"
     },
     {
@@ -133,11 +133,24 @@
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        416,
-        0
+        800,
+        288
       ],
-      "id": "6b4c5fb2-8db3-4288-a3a1-3c9a5b75b0e1",
+      "id": "a98ddf19-8221-4bbf-8a02-dafa45faa62d",
       "name": "Stats"
+    },
+    {
+      "parameters": {
+        "jsCode": "const today = new Date();\nconst dd = String(today.getDate()).padStart(2, '0');\nconst mm = String(today.getMonth() + 1).padStart(2, '0');\nconst yyyy = today.getFullYear();\nconst filename = `${dd}_${mm}_${yyyy}.html`;\nconst html = $input.first().json.html;\nconst baseUrl = 'http://hadoop:9870/webhdfs/v1';\n\n// Crear directorio /informes si no existe\ntry {\n  await helpers.httpRequest({\n    method: 'PUT',\n    url: `${baseUrl}/informes?op=MKDIRS`,\n  });\n} catch(e) {}\n\n// Paso 1: obtener la URL del DataNode\nconst step1 = await helpers.httpRequest({\n  method: 'PUT',\n  url: `${baseUrl}/informes/${filename}?op=CREATE&overwrite=true&noredirect=true`,\n  returnFullResponse: true,\n});\n\nconst dataNodeUrl = step1.body?.Location;\nif (!dataNodeUrl) throw new Error('WebHDFS: no se recibió Location en step1');\n\n// Paso 2: subir el HTML\nawait helpers.httpRequest({\n  method: 'PUT',\n  url: dataNodeUrl,\n  body: html,\n  headers: { 'Content-Type': 'text/html; charset=utf-8' },\n});\n\nreturn [{ json: { ...($input.first().json), hdfs_path: `/informes/${filename}`, hdfs_saved: true } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1424,
+        288
+      ],
+      "id": "461779e1-5f25-48d5-b480-4762040cb8c5",
+      "name": "Save to HDFS"
     }
   ],
   "pinData": {},
@@ -190,7 +203,7 @@
       "main": [
         [
           {
-            "node": "Send an Email",
+            "node": "Save to HDFS",
             "type": "main",
             "index": 0
           }
@@ -207,6 +220,17 @@
           }
         ]
       ]
+    },
+    "Save to HDFS": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": false,
@@ -214,11 +238,11 @@
     "executionOrder": "v1",
     "binaryMode": "separate"
   },
-  "versionId": "eea3c36a-8a4e-4c15-a3ed-27f2144e6b98",
+  "versionId": "9e71aa3f-df2b-4cda-ad22-a15dc88523a8",
   "meta": {
     "templateCredsSetupCompleted": true,
     "instanceId": "aba13ca4a58d61f84a2083c93398119f7d6a31864e39cb0020235f83cadf2d0d"
   },
-  "id": "PTvdWvAxh3q9rP57",
+  "id": "I4Eein1EI5ekw9RI",
   "tags": []
 }

@@ -22,6 +22,7 @@ services:
     ports:
       - "9870:9870"   # NameNode Web UI
       - "9000:9000"   # HDFS RPC
+      - "9864:9864"   # DataNode (necesario para WebHDFS OPEN/descarga)
       - "8088:8088"   # YARN ResourceManager UI
       - "8042:8042"   # NodeManager UI
       - "19888:19888" # MapReduce JobHistory
