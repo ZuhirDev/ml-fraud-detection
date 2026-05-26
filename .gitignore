@@ -1,7 +1,7 @@
 /data-neo
 /logs
 /plugins
-/data
+/data/processed
 
 .env
 

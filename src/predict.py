@@ -42,35 +42,26 @@ def load_model(model_path: Path):
         logger.error("❌ Error al cargar el modelo: %s", error)
         return None
 
-def build_prediction_dataframe(transaction: Transaction, grados: dict, pagerank: dict, comunidad: dict) -> pd.DataFrame:
-    """
-    Fusiona los datos de la petición (Pydantic) con las métricas extraídas en tiempo real 
-    desde Neo4j y formatea las columnas de forma idéntica al entrenamiento.
-    """
-    # 1. Mapear datos operativos usando snake_case del esquema
+def build_prediction_dataframe(transaction: Transaction, grados: dict, pagerank: dict) -> pd.DataFrame:
     mapped_data = {
-        "amount": transaction.amount,
-        "old_balance_orig": transaction.old_balance_orig,
-        "new_balance_orig": transaction.new_balance_orig,
-        "old_balance_dest": transaction.old_balance_dest,
-        "new_balance_dest": transaction.new_balance_dest,
+        "amount": float(transaction.amount),
+        "old_balance_orig": float(transaction.old_balance_orig),
+        "new_balance_orig": float(transaction.new_balance_orig),
+        "old_balance_dest": float(transaction.old_balance_dest),
+        "new_balance_dest": float(transaction.new_balance_dest),
     }
     
-    # 2. Inyectar variables topológicas obtenidas dinámicamente
-    mapped_data["in_degree_hist"] = grados["in_degree_hist"]
-    mapped_data["out_degree_hist"] = grados["out_degree_hist"]
-    mapped_data["orig_pagerank_hist"] = pagerank["orig_pagerank_hist"]
-    mapped_data["dest_pagerank_hist"] = pagerank["dest_pagerank_hist"]
-    # Nota: same_louvain_community_hist no se agrega al DataFrame final si tu 
-    # lista de columnas esperadas del modelo (MODEL_COLUMNS) no lo requiere.
+    mapped_data["in_degree_hist"] = float(grados["in_degree_hist"])
+    mapped_data["out_degree_hist"] = float(grados["out_degree_hist"])
+    mapped_data["orig_pagerank_hist"] = float(pagerank["orig_pagerank_hist"])
+    mapped_data["dest_pagerank_hist"] = float(pagerank["dest_pagerank_hist"])
 
-    # 3. One-Hot Encoding manual del tipo de transacción
     current_type = transaction.type.value.upper()
     for t_type in TRANSACTION_TYPES:
         mapped_data[f"type_{t_type}"] = 1.0 if current_type == t_type else 0.0
 
-    # Retorna garantizando el orden matemático estricto exigido por el árbol de decisión
-    return pd.DataFrame([mapped_data], columns=MODEL_COLUMNS)
+    df = pd.DataFrame([mapped_data], columns=MODEL_COLUMNS)
+    return df.astype(float)
 
 def format_prediction_result(prediction: int, probability: float) -> dict:
     return {

@@ -9,11 +9,8 @@ class TransactionType(str, Enum):
     TRANSFER = "TRANSFER"
 
 class Transaction(BaseModel):
-    # Identificadores indispensables para las queries de Neo4j
-    nameOrig: str = Field(..., example="C1305486145")
-    nameDest: str = Field(..., example="C553264065")
-    
-    # Datos operativos
+    nameOrig: str
+    nameDest: str
     amount: float
     old_balance_orig: float
     new_balance_orig: float

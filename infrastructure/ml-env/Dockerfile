@@ -5,19 +5,12 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV JUPYTER_ENABLE_LAB=yes
 
-# Java necesario para PySpark (JAVA_HOME se fija después de instalar)
 WORKDIR /app
 
-# Java (PySpark) + libgomp1 (LightGBM) + procps (ps que usan scripts de PySpark)
+# Instalamos ÚNICAMENTE la dependencia estricta para LightGBM
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    default-jre-headless \
-    procps \
     libgomp1 \
-    && rm -rf /var/lib/apt/lists/* \
-    && ln -sf "$(dirname $(dirname $(readlink -f $(which java))))" /opt/java
-
-ENV JAVA_HOME=/opt/java
-ENV PYSPARK_PYTHON=python3
+    && rm -rf /var/lib/apt/lists/*
 
 # Copiar e instalar dependencias Python
 COPY requirements.txt .
